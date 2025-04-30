@@ -1,52 +1,17 @@
-# Prerequisites
-*.d
+.gitignore
+.cache
+.vscode
 
-# Object files
-*.o
-*.ko
-*.obj
-*.elf
+.clang-tidy
 
-# Linker output
-*.ilk
-*.map
-*.exp
+compile_commands.json
 
-# Precompiled Headers
-*.gch
-*.pch
+build
 
-# Libraries
-*.lib
-*.a
-*.la
-*.lo
+*.bak
+*.set
+*.css
+*.drawio
+*.drawio.bkp
 
-# Shared objects (inc. Windows DLLs)
-*.dll
-*.so
-*.so.*
-*.dylib
 
-# Executables
-*.exe
-*.out
-*.app
-*.i*86
-*.x86_64
-*.hex
-
-# Debug files
-*.dSYM/
-*.su
-*.idb
-*.pdb
-
-# Kernel Module Compile Results
-*.mod*
-*.cmd
-.tmp_versions/
-modules.order
-Module.symvers
-Mkfile.old
-dkms.conf
