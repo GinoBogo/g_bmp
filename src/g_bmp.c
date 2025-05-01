@@ -118,9 +118,9 @@ static bool Load(struct g_bmp_t *self, const char *filename) {
                     const uint32_t y_row = y * width;
 
                     for (uint32_t x = 0; x < width; ++x) {
-                        fread(self->r.ptr + y_row + x, sizeof(uint8_t), 1, file);
-                        fread(self->g.ptr + y_row + x, sizeof(uint8_t), 1, file);
                         fread(self->b.ptr + y_row + x, sizeof(uint8_t), 1, file);
+                        fread(self->g.ptr + y_row + x, sizeof(uint8_t), 1, file);
+                        fread(self->r.ptr + y_row + x, sizeof(uint8_t), 1, file);
                     }
                 }
 
@@ -151,9 +151,9 @@ static bool Save(struct g_bmp_t *self, const char *filename) {
                 const uint32_t y_row = y * width;
 
                 for (uint32_t x = 0; x < width; ++x) {
-                    fwrite(self->r.ptr + y_row + x, sizeof(uint8_t), 1, file);
-                    fwrite(self->g.ptr + y_row + x, sizeof(uint8_t), 1, file);
                     fwrite(self->b.ptr + y_row + x, sizeof(uint8_t), 1, file);
+                    fwrite(self->g.ptr + y_row + x, sizeof(uint8_t), 1, file);
+                    fwrite(self->r.ptr + y_row + x, sizeof(uint8_t), 1, file);
                 }
             }
 
