@@ -59,7 +59,7 @@ static bool Create(struct g_bmp_t *self, int32_t width, int32_t height) {
             const uint32_t bits       = (uint32_t)(3 * 8); // 24-bit color space
             const uint32_t bmp_h_size = (uint32_t)sizeof(g_bmp_header_t);
             const uint32_t dib_h_size = (uint32_t)sizeof(g_dib_header_t);
-            const uint32_t row_size   = ((bits * width + 31) / 32) * 4; // 32-bit aligned
+            const uint32_t row_size   = ((bits * width * 3 + 3) & ~3); // 32-bit aligned
             const uint32_t image_size = row_size * height;
             const uint32_t total_size = (bmp_h_size + dib_h_size) + image_size;
 
@@ -110,21 +110,36 @@ static bool Load(struct g_bmp_t *self, const char *filename) {
             fread(&self->bmp_header, sizeof(g_bmp_header_t), 1, file);
             fread(&self->dib_header, sizeof(g_dib_header_t), 1, file);
 
-            uint32_t width  = (uint32_t)self->dib_header.width;
-            uint32_t height = (uint32_t)self->dib_header.height;
+            const uint32_t width  = (uint32_t)self->dib_header.width;
+            const uint32_t height = (uint32_t)self->dib_header.height;
 
             if (self->Create(self, width, height)) {
-                for (uint32_t y = 0; y < height; ++y) {
-                    const uint32_t y_row = y * width;
+                const uint32_t row_size = (uint32_t)((width * 3 + 3) & ~3); // 32-bit aligned
 
-                    for (uint32_t x = 0; x < width; ++x) {
-                        fread(self->b.ptr + y_row + x, sizeof(uint8_t), 1, file);
-                        fread(self->g.ptr + y_row + x, sizeof(uint8_t), 1, file);
-                        fread(self->r.ptr + y_row + x, sizeof(uint8_t), 1, file);
+                uint8_t *buffer = (uint8_t *)malloc(row_size);
+
+                if (buffer != NULL) {
+                    for (uint32_t y = 0; y < height; ++y) {
+                        const uint32_t y_row = (height - 1 - y) * width;
+
+                        if (fread(buffer, sizeof(uint8_t), row_size, file) != row_size) {
+                            free(buffer);
+                            rvalue = false;
+                            break;
+                        }
+
+                        for (uint32_t x = 0; x < width; ++x) {
+                            const uint32_t x_col = x * 3;
+
+                            self->b.ptr[y_row + x] = buffer[x_col + 0];
+                            self->g.ptr[y_row + x] = buffer[x_col + 1];
+                            self->r.ptr[y_row + x] = buffer[x_col + 2];
+                        }
                     }
-                }
 
-                rvalue = true;
+                    free(buffer);
+                    rvalue = true;
+                }
             }
 
             fclose(file);
@@ -144,22 +159,37 @@ static bool Save(struct g_bmp_t *self, const char *filename) {
             fwrite(&self->bmp_header, sizeof(g_bmp_header_t), 1, file);
             fwrite(&self->dib_header, sizeof(g_dib_header_t), 1, file);
 
-            uint32_t width  = (uint32_t)self->r.width;
-            uint32_t height = (uint32_t)self->r.height;
+            const uint32_t width  = (uint32_t)self->r.width;
+            const uint32_t height = (uint32_t)self->r.height;
 
-            for (uint32_t y = 0; y < height; ++y) {
-                const uint32_t y_row = y * width;
+            const uint32_t row_size = (uint32_t)((width * 3 + 3) & ~3); // 32-bit aligned
 
-                for (uint32_t x = 0; x < width; ++x) {
-                    fwrite(self->b.ptr + y_row + x, sizeof(uint8_t), 1, file);
-                    fwrite(self->g.ptr + y_row + x, sizeof(uint8_t), 1, file);
-                    fwrite(self->r.ptr + y_row + x, sizeof(uint8_t), 1, file);
+            uint8_t *buffer = (uint8_t *)malloc(row_size);
+
+            if (buffer != NULL) {
+                for (uint32_t y = 0; y < height; ++y) {
+                    const uint32_t y_row = (height - 1 - y) * width;
+
+                    for (uint32_t x = 0; x < width; ++x) {
+                        const uint32_t x_col = x * 3;
+
+                        buffer[x_col + 0] = self->b.ptr[y_row + x];
+                        buffer[x_col + 1] = self->g.ptr[y_row + x];
+                        buffer[x_col + 2] = self->r.ptr[y_row + x];
+                    }
+
+                    if (fwrite(buffer, sizeof(uint8_t), row_size, file) != row_size) {
+                        free(buffer);
+                        rvalue = false;
+                        break;
+                    }
                 }
+
+                free(buffer);
+                rvalue = true;
             }
 
             fclose(file);
-
-            rvalue = true;
         }
     }
 
