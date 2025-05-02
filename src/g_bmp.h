@@ -62,6 +62,8 @@ typedef struct g_bmp_t {
 
     bool (*toGrayscale)(struct g_bmp_t *self);
 
+    bool (*applyKernel)(struct g_bmp_t *self, struct g_bmp_t *output, float *kernel_ptr, uint32_t kernel_len);
+
     // intrinsic
     bool _is_safe;
 } g_bmp_t;

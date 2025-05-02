@@ -18,27 +18,6 @@ int main(int argc, char *argv[]) {
 
     g_bmp_link(&image);
 
-    if (image.Create(&image, 64, 64)) {
-        uint32_t width  = image.getWidth(&image);
-        uint32_t height = image.getHeight(&image);
-
-        for (uint32_t y = 0; y < height; y++) {
-            const uint32_t y_row = y * width;
-
-            for (uint32_t x = 0; x < width; x++) {
-                float h = 255 * (x / (float)width);
-
-                image.r.ptr[y_row + x] = (uint8_t)h;
-                image.g.ptr[y_row + x] = (uint8_t)h;
-                image.b.ptr[y_row + x] = (uint8_t)h;
-            }
-        }
-
-        image.Save(&image, "g_bmp_grayscale.bmp");
-    }
-
-    image.Destroy(&image);
-
     if (image.Load(&image, "sample-00.bmp")) {
         if (image.toGrayscale(&image)) {
             image.Save(&image, "sample-00_grayscale.bmp");
@@ -47,10 +26,46 @@ int main(int argc, char *argv[]) {
 
     image.Destroy(&image);
 
+    // clang-format off
+    const float laplacian[9] = {
+         0, -2,  0,
+        -2,  8, -2,
+         0, -2,  0
+    };
+    // clang-format on
+
+    if (image.Load(&image, "sample-00.bmp")) {
+        g_bmp_t output;
+
+        g_bmp_link(&output);
+
+        if (image.applyKernel(&image, &output, (float *)laplacian, 3)) {
+            output.Save(&output, "sample-00_laplacian.bmp");
+        }
+
+        output.Destroy(&output);
+    }
+
+    image.Destroy(&image);
+
     if (image.Load(&image, "sample-01.bmp")) {
         if (image.toGrayscale(&image)) {
             image.Save(&image, "sample-01_grayscale.bmp");
         }
+    }
+
+    image.Destroy(&image);
+
+    if (image.Load(&image, "sample-01.bmp")) {
+        g_bmp_t output;
+
+        g_bmp_link(&output);
+
+        if (image.applyKernel(&image, &output, (float *)laplacian, 3)) {
+            output.Save(&output, "sample-01_laplacian.bmp");
+        }
+
+        output.Destroy(&output);
     }
 
     image.Destroy(&image);

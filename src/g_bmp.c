@@ -9,6 +9,7 @@
 #include "g_bmp.h"
 
 #include <assert.h> // assert
+#include <math.h>   // fmaxf, fminf
 #include <stddef.h> // NULL
 #include <stdio.h>  // FILE, fopen, fclose, fread, fwrite
 #include <stdlib.h> // free, malloc
@@ -240,6 +241,69 @@ static bool toGrayscale(struct g_bmp_t *self) {
     return rvalue;
 }
 
+static bool applyKernel(struct g_bmp_t *self,
+                        struct g_bmp_t *output,
+                        float          *kernel_ptr,
+                        uint32_t        kernel_len) {
+    bool rvalue = false;
+
+    if ((self != NULL) && self->_is_safe) {
+        rvalue = true;
+
+        rvalue = rvalue && (output != NULL);
+        rvalue = rvalue && (kernel_ptr != NULL);
+        rvalue = rvalue && (kernel_len > 1);
+
+        if (rvalue) {
+            const uint32_t src_width  = (uint32_t)self->r.width;
+            const uint32_t src_height = (uint32_t)self->r.height;
+
+            const uint32_t dst_width  = src_width - kernel_len + 1;
+            const uint32_t dst_height = src_height - kernel_len + 1;
+
+            if (output->Create(output, dst_width, dst_height)) {
+                for (uint32_t y = 0; y < dst_height; ++y) {
+                    for (uint32_t x = 0; x < dst_width; ++x) {
+                        float sum_r = 0.0f;
+                        float sum_g = 0.0f;
+                        float sum_b = 0.0f;
+
+                        for (uint32_t ky = 0; ky < kernel_len; ++ky) {
+                            for (uint32_t kx = 0; kx < kernel_len; ++kx) {
+                                const uint32_t src_x = x + kx;
+                                const uint32_t src_y = y + ky;
+
+                                const uint32_t kernel_idx = ky * kernel_len + kx;
+                                const float    kernel_val = kernel_ptr[kernel_idx];
+
+                                const uint32_t pixel_idx = src_y * src_width + src_x;
+
+                                sum_r += ((float)(self->r.ptr[pixel_idx]) * kernel_val);
+                                sum_g += ((float)(self->g.ptr[pixel_idx]) * kernel_val);
+                                sum_b += ((float)(self->b.ptr[pixel_idx]) * kernel_val);
+                            }
+                        }
+
+                        const uint32_t dst_idx = y * dst_width + x;
+
+                        sum_r = fminf(fmaxf(sum_r, 0.0f), 255.0f);
+                        sum_g = fminf(fmaxf(sum_g, 0.0f), 255.0f);
+                        sum_b = fminf(fmaxf(sum_b, 0.0f), 255.0f);
+
+                        output->r.ptr[dst_idx] = (uint8_t)(sum_r);
+                        output->g.ptr[dst_idx] = (uint8_t)(sum_g);
+                        output->b.ptr[dst_idx] = (uint8_t)(sum_b);
+                    }
+                }
+
+                rvalue = true;
+            }
+        }
+    }
+
+    return rvalue;
+}
+
 void g_bmp_link(g_bmp_t *self) {
     if (self != NULL) {
         // variables & intrinsic
@@ -253,6 +317,7 @@ void g_bmp_link(g_bmp_t *self) {
         self->getWidth    = getWidth;
         self->getHeight   = getHeight;
         self->toGrayscale = toGrayscale;
+        self->applyKernel = applyKernel;
     }
 }
 
