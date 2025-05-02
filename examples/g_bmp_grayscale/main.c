@@ -26,20 +26,22 @@ int main(int argc, char *argv[]) {
 
     image.Destroy(&image);
 
+    // NOTE: use of aggressive laplacian kernel
     // clang-format off
-    const float laplacian[9] = {
+    const float kernel_ptr[] = {
          0, -2,  0,
         -2,  8, -2,
          0, -2,  0
     };
     // clang-format on
+    const uint32_t kernel_len = sizeof(kernel_ptr) / sizeof(kernel_ptr[0]);
 
     if (image.Load(&image, "sample-00.bmp")) {
         g_bmp_t output;
 
         g_bmp_link(&output);
 
-        if (image.applyKernel(&image, &output, (float *)laplacian, 3)) {
+        if (image.applyKernel(&image, &output, (float *)kernel_ptr, kernel_len)) {
             output.Save(&output, "sample-00_laplacian.bmp");
         }
 
@@ -61,7 +63,7 @@ int main(int argc, char *argv[]) {
 
         g_bmp_link(&output);
 
-        if (image.applyKernel(&image, &output, (float *)laplacian, 3)) {
+        if (image.applyKernel(&image, &output, (float *)kernel_ptr, kernel_len)) {
             output.Save(&output, "sample-01_laplacian.bmp");
         }
 
