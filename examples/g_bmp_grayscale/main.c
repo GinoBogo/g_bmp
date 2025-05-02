@@ -39,5 +39,21 @@ int main(int argc, char *argv[]) {
 
     image.Destroy(&image);
 
+    if (image.Load(&image, "sample-00.bmp")) {
+        if (image.toGrayscale(&image)) {
+            image.Save(&image, "sample-00_grayscale.bmp");
+        }
+    }
+
+    image.Destroy(&image);
+
+    if (image.Load(&image, "sample-01.bmp")) {
+        if (image.toGrayscale(&image)) {
+            image.Save(&image, "sample-01_grayscale.bmp");
+        }
+    }
+
+    image.Destroy(&image);
+
     return 0;
 }

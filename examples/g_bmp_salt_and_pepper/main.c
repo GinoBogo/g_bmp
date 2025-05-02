@@ -41,5 +41,13 @@ int main(int argc, char *argv[]) {
 
     image.Destroy(&image);
 
+    if (image.Load(&image, "g_bmp_salt_and_pepper.bmp")) {
+        if (image.toGrayscale(&image)) {
+            image.Save(&image, "g_bmp_salt_and_pepper_grayscale.bmp");
+        }
+    }
+
+    image.Destroy(&image);
+
     return 0;
 }

@@ -210,18 +210,49 @@ static int32_t getHeight(struct g_bmp_t *self) {
     return 0;
 }
 
+static bool toGrayscale(struct g_bmp_t *self) {
+    bool rvalue = false;
+
+    if ((self != NULL) && self->_is_safe) {
+        const uint32_t width  = (uint32_t)self->r.width;
+        const uint32_t height = (uint32_t)self->r.height;
+
+        for (uint32_t y = 0; y < height; ++y) {
+            const uint32_t y_row = (height - 1 - y) * width;
+
+            for (uint32_t x = 0; x < width; ++x) {
+                const uint8_t r = self->r.ptr[y_row + x];
+                const uint8_t g = self->g.ptr[y_row + x];
+                const uint8_t b = self->b.ptr[y_row + x];
+
+                // NOTE: luminance (Y) formula
+                const uint8_t gray = (uint8_t)((r * 0.299) + (g * 0.587) + (b * 0.114));
+
+                self->r.ptr[y_row + x] = gray;
+                self->g.ptr[y_row + x] = gray;
+                self->b.ptr[y_row + x] = gray;
+            }
+        }
+
+        rvalue = true;
+    }
+
+    return rvalue;
+}
+
 void g_bmp_link(g_bmp_t *self) {
     if (self != NULL) {
         // variables & intrinsic
         __unsafe_reset(self);
 
         // functions
-        self->Create    = Create;
-        self->Destroy   = Destroy;
-        self->Load      = Load;
-        self->Save      = Save;
-        self->getWidth  = getWidth;
-        self->getHeight = getHeight;
+        self->Create      = Create;
+        self->Destroy     = Destroy;
+        self->Load        = Load;
+        self->Save        = Save;
+        self->getWidth    = getWidth;
+        self->getHeight   = getHeight;
+        self->toGrayscale = toGrayscale;
     }
 }
 
