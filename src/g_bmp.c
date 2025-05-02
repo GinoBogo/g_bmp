@@ -267,15 +267,18 @@ static bool applyKernel(struct g_bmp_t *self,
 
             if (output->Create(output, dst_width, dst_height)) {
                 for (uint32_t y = 0; y < dst_height; ++y) {
+                    const uint32_t y_row = y * dst_width;
+
                     for (uint32_t x = 0; x < dst_width; ++x) {
                         float sum_r = 0.0f;
                         float sum_g = 0.0f;
                         float sum_b = 0.0f;
 
                         for (uint32_t ky = 0; ky < kernel_dim; ++ky) {
+                            const uint32_t src_y = y + ky;
+
                             for (uint32_t kx = 0; kx < kernel_dim; ++kx) {
                                 const uint32_t src_x = x + kx;
-                                const uint32_t src_y = y + ky;
 
                                 const uint32_t kernel_idx = ky * kernel_dim + kx;
                                 const float    kernel_val = kernel_ptr[kernel_idx];
@@ -288,7 +291,7 @@ static bool applyKernel(struct g_bmp_t *self,
                             }
                         }
 
-                        const uint32_t dst_idx = y * dst_width + x;
+                        const uint32_t dst_idx = y_row + x;
 
                         // clang-format off
                         output->r.ptr[dst_idx] = (uint8_t)((sum_r > 255.0f) ? 255 : ((sum_r < 0.0f) ? 0 : sum_r));
