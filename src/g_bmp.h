@@ -55,8 +55,8 @@ typedef struct g_bmp_t {
     void (*Destroy)(struct g_bmp_t *self);
     bool (*Load)(struct g_bmp_t *self, const char *filename);
     bool (*Save)(struct g_bmp_t *self, const char *filename);
-    int32_t (*GetWidth)(struct g_bmp_t *self);
-    int32_t (*GetHeight)(struct g_bmp_t *self);
+    int32_t (*getWidth)(struct g_bmp_t *self);
+    int32_t (*getHeight)(struct g_bmp_t *self);
 
     // intrinsic
     bool _is_safe;

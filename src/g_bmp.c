@@ -196,14 +196,14 @@ static bool Save(struct g_bmp_t *self, const char *filename) {
     return rvalue;
 }
 
-static int32_t GetWidth(struct g_bmp_t *self) {
+static int32_t getWidth(struct g_bmp_t *self) {
     if ((self != NULL) && self->_is_safe) {
         return self->r.width;
     }
     return 0;
 }
 
-static int32_t GetHeight(struct g_bmp_t *self) {
+static int32_t getHeight(struct g_bmp_t *self) {
     if ((self != NULL) && self->_is_safe) {
         return self->r.height;
     }
@@ -220,8 +220,8 @@ void g_bmp_link(g_bmp_t *self) {
         self->Destroy   = Destroy;
         self->Load      = Load;
         self->Save      = Save;
-        self->GetWidth  = GetWidth;
-        self->GetHeight = GetHeight;
+        self->getWidth  = getWidth;
+        self->getHeight = getHeight;
     }
 }
 

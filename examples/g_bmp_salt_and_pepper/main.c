@@ -21,8 +21,8 @@ int main(int argc, char *argv[]) {
     g_bmp_link(&image);
 
     if (image.Create(&image, 256, 256)) {
-        uint32_t width  = image.GetWidth(&image);
-        uint32_t height = image.GetHeight(&image);
+        uint32_t width  = image.getWidth(&image);
+        uint32_t height = image.getHeight(&image);
 
         g_random_seed(time(NULL));
 

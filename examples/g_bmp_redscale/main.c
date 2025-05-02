@@ -19,8 +19,8 @@ int main(int argc, char *argv[]) {
     g_bmp_link(&image);
 
     if (image.Create(&image, 64, 64)) {
-        uint32_t width  = image.GetWidth(&image);
-        uint32_t height = image.GetHeight(&image);
+        uint32_t width  = image.getWidth(&image);
+        uint32_t height = image.getHeight(&image);
 
         for (uint32_t y = 0; y < height; y++) {
             const uint32_t y_row = y * width;
