@@ -9,7 +9,7 @@
 #include "g_bmp.h"
 
 #include <assert.h> // assert
-#include <math.h>   // sqrtf
+#include <math.h>   // M_PI, acosf, fmaxf, fminf, sqrtf
 #include <stddef.h> // NULL
 #include <stdio.h>  // FILE, fopen, fclose, fread, fwrite
 #include <stdlib.h> // free, malloc
@@ -260,12 +260,15 @@ static bool applyKernel(struct g_bmp_t *self, struct g_bmp_t *output, float *ker
             const int32_t width  = self->r.width;
             const int32_t height = self->r.height;
 
-            if (output->Create(output, width, height)) {
-                int dst_y = 0;
-                int dst_x = 0;
+            rvalue = output->Create(output, width, height);
 
+            if (rvalue) {
                 for (int32_t y = -kernel_pad; y < height - kernel_pad; ++y) {
+                    const int32_t dst_y = y + kernel_pad;
+
                     for (int32_t x = -kernel_pad; x < width - kernel_pad; ++x) {
+                        const int32_t dst_x = x + kernel_pad;
+
                         float sum_r = 0.0f;
                         float sum_g = 0.0f;
                         float sum_b = 0.0f;
@@ -295,20 +298,11 @@ static bool applyKernel(struct g_bmp_t *self, struct g_bmp_t *output, float *ker
 
                         const int32_t dst_idx = dst_y * width + dst_x;
 
-                        // clang-format off
-                        output->r.ptr[dst_idx] = (uint8_t)((sum_r > 255.0f) ? 255 : ((sum_r < 0.0f) ? 0 : sum_r));
-                        output->g.ptr[dst_idx] = (uint8_t)((sum_g > 255.0f) ? 255 : ((sum_g < 0.0f) ? 0 : sum_g));
-                        output->b.ptr[dst_idx] = (uint8_t)((sum_b > 255.0f) ? 255 : ((sum_b < 0.0f) ? 0 : sum_b));
-                        // clang-format on
-
-                        if (++dst_x == width) {
-                            dst_x = 0;
-                            dst_y += 1;
-                        }
+                        output->r.ptr[dst_idx] = (uint8_t)fminf(fmaxf(sum_r, 0.0f), 255.0f);
+                        output->g.ptr[dst_idx] = (uint8_t)fminf(fmaxf(sum_g, 0.0f), 255.0f);
+                        output->b.ptr[dst_idx] = (uint8_t)fminf(fmaxf(sum_b, 0.0f), 255.0f);
                     }
                 }
-
-                rvalue = true;
             }
         }
     }
