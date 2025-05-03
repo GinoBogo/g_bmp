@@ -241,16 +241,14 @@ static bool toGrayscale(struct g_bmp_t *self) {
     return rvalue;
 }
 
-static bool applyKernel(struct g_bmp_t *self,
-                        struct g_bmp_t *output,
-                        float          *kernel_ptr,
-                        uint32_t        kernel_len) {
+static bool applyKernel(struct g_bmp_t *self, struct g_bmp_t *output, float *kernel_ptr, int32_t kernel_len) {
     bool rvalue = false;
 
     if ((self != NULL) && self->_is_safe) {
         rvalue = true;
 
-        const uint32_t kernel_dim = (uint32_t)sqrtf((float)kernel_len);
+        const int32_t kernel_dim = (int32_t)sqrtf((float)kernel_len);
+        const int32_t kernel_pad = (kernel_dim - 1) / 2;
 
         rvalue = rvalue && (output != NULL);
         rvalue = rvalue && (kernel_ptr != NULL);
@@ -259,31 +257,35 @@ static bool applyKernel(struct g_bmp_t *self,
         rvalue = rvalue && (kernel_dim % 2 == 1); // odd-sized kernels only
 
         if (rvalue) {
-            const uint32_t src_width  = (uint32_t)self->r.width;
-            const uint32_t src_height = (uint32_t)self->r.height;
+            const int32_t width  = self->r.width;
+            const int32_t height = self->r.height;
 
-            const uint32_t dst_width  = src_width - kernel_dim + 1;
-            const uint32_t dst_height = src_height - kernel_dim + 1;
+            if (output->Create(output, width, height)) {
+                int dst_y = 0;
+                int dst_x = 0;
 
-            if (output->Create(output, dst_width, dst_height)) {
-                for (uint32_t y = 0; y < dst_height; ++y) {
-                    const uint32_t y_row = y * dst_width;
-
-                    for (uint32_t x = 0; x < dst_width; ++x) {
+                for (int32_t y = -kernel_pad; y < height - kernel_pad; ++y) {
+                    for (int32_t x = -kernel_pad; x < width - kernel_pad; ++x) {
                         float sum_r = 0.0f;
                         float sum_g = 0.0f;
                         float sum_b = 0.0f;
 
-                        for (uint32_t ky = 0; ky < kernel_dim; ++ky) {
-                            const uint32_t src_y = y + ky;
+                        for (int32_t ky = 0; ky < kernel_dim; ++ky) {
+                            // Clamp to edge for y coordinate
+                            const int32_t src_y = (y + ky < 0)       ? 0          //
+                                                : (y + ky >= height) ? height - 1 //
+                                                                     : y + ky;    //
 
-                            for (uint32_t kx = 0; kx < kernel_dim; ++kx) {
-                                const uint32_t src_x = x + kx;
+                            for (int32_t kx = 0; kx < kernel_dim; ++kx) {
+                                // Clamp to edge for x coordinate
+                                const int32_t src_x = (x + kx < 0)      ? 0         //
+                                                    : (x + kx >= width) ? width - 1 //
+                                                                        : x + kx;   //
 
-                                const uint32_t kernel_idx = ky * kernel_dim + kx;
-                                const float    kernel_val = kernel_ptr[kernel_idx];
+                                const int32_t kernel_idx = ky * kernel_dim + kx;
+                                const float   kernel_val = kernel_ptr[kernel_idx];
 
-                                const uint32_t pixel_idx = src_y * src_width + src_x;
+                                const int32_t pixel_idx = src_y * width + src_x;
 
                                 sum_r += ((float)(self->r.ptr[pixel_idx]) * kernel_val);
                                 sum_g += ((float)(self->g.ptr[pixel_idx]) * kernel_val);
@@ -291,18 +293,106 @@ static bool applyKernel(struct g_bmp_t *self,
                             }
                         }
 
-                        const uint32_t dst_idx = y_row + x;
+                        const int32_t dst_idx = dst_y * width + dst_x;
 
                         // clang-format off
                         output->r.ptr[dst_idx] = (uint8_t)((sum_r > 255.0f) ? 255 : ((sum_r < 0.0f) ? 0 : sum_r));
                         output->g.ptr[dst_idx] = (uint8_t)((sum_g > 255.0f) ? 255 : ((sum_g < 0.0f) ? 0 : sum_g));
                         output->b.ptr[dst_idx] = (uint8_t)((sum_b > 255.0f) ? 255 : ((sum_b < 0.0f) ? 0 : sum_b));
                         // clang-format on
+
+                        if (++dst_x == width) {
+                            dst_x = 0;
+                            dst_y += 1;
+                        }
                     }
                 }
 
                 rvalue = true;
             }
+        }
+    }
+
+    return rvalue;
+}
+
+static g_hsi_t __rgb_to_hsi(g_rgb_t rgb) {
+    g_hsi_t hsi;
+
+    const float R = (float)rgb.r;
+    const float G = (float)rgb.g;
+    const float B = (float)rgb.b;
+
+    // Calculate INTENSITY
+    hsi.i = (R + G + B) / 3.0f;
+
+    // Calculate SATURATION
+    float min_RGB = fminf(fminf(R, G), B);
+
+    if (hsi.i == 0.0f) {
+        hsi.s = 0.0f; // Undefined (achromatic)
+    } else {
+        hsi.s = 1.0f - (min_RGB / hsi.i);
+    }
+
+    // Calculate HUE (radians)
+    float num = 0.5f * ((R - G) + (R - B));
+    float den = sqrtf((R - G) * (R - G) + (R - B) * (G - B));
+
+    if (den == 0.0f) {
+        hsi.h = 0.0f; // Undefined (achromatic)
+    } else {
+        float theta = acosf(num / den);
+
+        hsi.h = (B <= G) ? theta : (2.0f * (float)M_PI) - theta;
+    }
+
+    return hsi;
+}
+
+static bool selectColor(struct g_bmp_t *self, struct g_bmp_t *output, g_rgb_t color, g_hsi_t range) {
+    bool rvalue = false;
+
+    if ((self != NULL) && self->_is_safe) {
+        rvalue = true;
+
+        const uint32_t width  = (uint32_t)self->r.width;
+        const uint32_t height = (uint32_t)self->r.height;
+
+        if (output->Create(output, width, height)) {
+            const g_hsi_t ref = __rgb_to_hsi(color);
+
+            for (uint32_t y = 0; y < height; ++y) {
+                const uint32_t y_row = y * width;
+
+                for (uint32_t x = 0; x < width; ++x) {
+                    const uint32_t pixel_idx = y_row + x;
+
+                    g_rgb_t rgb = {
+                        .r = self->r.ptr[pixel_idx],
+                        .g = self->g.ptr[pixel_idx],
+                        .b = self->b.ptr[pixel_idx],
+                    };
+
+                    g_hsi_t hsi = __rgb_to_hsi(rgb);
+
+                    const bool check_1 = ((ref.h - range.h) <= hsi.h) && (hsi.h <= (ref.h + range.h));
+                    const bool check_2 = ((ref.s - range.s) <= hsi.s) && (hsi.s <= (ref.s + range.s));
+                    const bool check_3 = ((ref.i - range.i) <= hsi.i) && (hsi.i <= (ref.i + range.i));
+
+                    if (check_1 && check_2 && check_3) {
+                        output->r.ptr[pixel_idx] = rgb.r;
+                        output->g.ptr[pixel_idx] = rgb.g;
+                        output->b.ptr[pixel_idx] = rgb.b;
+                    } else {
+                        output->r.ptr[pixel_idx] = 0;
+                        output->g.ptr[pixel_idx] = 0;
+                        output->b.ptr[pixel_idx] = 0;
+                    }
+                }
+            }
+
+            rvalue = true;
         }
     }
 
@@ -323,6 +413,7 @@ void g_bmp_link(g_bmp_t *self) {
         self->getHeight   = getHeight;
         self->toGrayscale = toGrayscale;
         self->applyKernel = applyKernel;
+        self->selectColor = selectColor;
     }
 }
 

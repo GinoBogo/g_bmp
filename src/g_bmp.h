@@ -14,6 +14,18 @@
 
 // -----------------------------------------------------------------------------
 
+typedef struct __attribute__((packed)) g_rgb_t {
+    uint8_t r;
+    uint8_t g;
+    uint8_t b;
+} g_rgb_t;
+
+typedef struct __attribute__((packed)) g_hsi_t {
+    float h;
+    float s;
+    float i;
+} g_hsi_t;
+
 typedef struct __attribute__((packed)) g_bmp_header_t {
     uint16_t type;       // Magic identifier: "BM"
     uint32_t size;       // File size in bytes
@@ -62,7 +74,9 @@ typedef struct g_bmp_t {
 
     bool (*toGrayscale)(struct g_bmp_t *self);
 
-    bool (*applyKernel)(struct g_bmp_t *self, struct g_bmp_t *output, float *kernel_ptr, uint32_t kernel_len);
+    bool (*applyKernel)(struct g_bmp_t *self, struct g_bmp_t *output, float *kernel_ptr, int32_t kernel_len);
+
+    bool (*selectColor)(struct g_bmp_t *self, struct g_bmp_t *output, g_rgb_t color, g_hsi_t range);
 
     // intrinsic
     bool _is_safe;
