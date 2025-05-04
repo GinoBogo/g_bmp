@@ -16,6 +16,8 @@
 #include <string.h> // memset
 
 // -----------------------------------------------------------------------------
+// Internal Functions
+// -----------------------------------------------------------------------------
 
 static void __unsafe_reset(g_bmp_t *self) {
     assert(self != NULL);
@@ -31,10 +33,53 @@ static void __unsafe_reset(g_bmp_t *self) {
     self->_is_safe = false;
 }
 
+static g_hsi_t __rgb_to_hsi(g_rgb_t rgb) {
+    g_hsi_t hsi = {0};
+
+    const uint8_t R = rgb.r;
+    const uint8_t G = rgb.g;
+    const uint8_t B = rgb.b;
+
+    const uint8_t  max_RGB = (R > G) ? ((R > B) ? R : B) : ((G > B) ? G : B);
+    const uint8_t  min_RGB = (R < G) ? ((R < B) ? R : B) : ((G < B) ? G : B);
+    const uint8_t  delta   = max_RGB - min_RGB;
+    const uint16_t sum     = R + G + B;
+
+    // Intensity (I)
+    hsi.i = (float)sum / 765.0f; // 3 * 255 = 765
+
+    // Saturation (S)
+    if (delta >= 10) { // Threshold
+        hsi.s = 1.0f - ((float)min_RGB / 255.0f) / hsi.i;
+    }
+
+    // Hue (H)
+    if (delta >= 10) { // Threshold
+        float hue;
+        if (max_RGB == R) {
+            hue = (G - B) / (float)delta;
+        } else if (max_RGB == G) {
+            hue = 2.0f + (B - R) / (float)delta;
+        } else {
+            hue = 4.0f + (R - G) / (float)delta;
+        }
+
+        // Scale hue to [0, 2π]
+        hsi.h = (hue < 0.0f) ? hue + (float)(2.0f * M_PI) : hue;
+        hsi.h *= (float)M_PI / 3.0f;
+    }
+
+    return hsi;
+}
+
+// -----------------------------------------------------------------------------
+// Linked Functions
+// -----------------------------------------------------------------------------
+
 static bool Create(struct g_bmp_t *self, int32_t width, int32_t height) {
     bool rvalue = false;
 
-    if (self != NULL) {
+    if ((self != NULL) && (width > 0) && (height > 0)) {
         self->Destroy(self);
 
         self->r.ptr = (uint8_t *)malloc(width * height * sizeof(uint8_t));
@@ -102,7 +147,7 @@ static void Destroy(struct g_bmp_t *self) {
 static bool Load(struct g_bmp_t *self, const char *filename) {
     bool rvalue = false;
 
-    if (self != NULL) {
+    if ((self != NULL) && (filename != NULL)) {
         FILE *file = fopen(filename, "rb");
 
         if (file != NULL) {
@@ -111,32 +156,41 @@ static bool Load(struct g_bmp_t *self, const char *filename) {
             fread(&self->bmp_header, sizeof(g_bmp_header_t), 1, file);
             fread(&self->dib_header, sizeof(g_dib_header_t), 1, file);
 
-            const uint32_t width  = (uint32_t)self->dib_header.width;
-            const uint32_t height = (uint32_t)self->dib_header.height;
+            const int32_t width  = self->dib_header.width;
+            const int32_t height = self->dib_header.height;
 
             if (self->Create(self, width, height)) {
-                const uint32_t row_size = (uint32_t)((width * 3 + 3) & ~3); // 32-bit aligned
+                const int32_t row_size = (width * 3 + 3) & ~3; // 32-bit aligned
 
                 uint8_t *buffer = (uint8_t *)malloc(row_size);
 
                 if (buffer != NULL) {
-                    for (uint32_t y = 0; y < height; ++y) {
-                        const uint32_t y_row = (height - 1 - y) * width;
+                    for (int32_t y = 0; y < height; ++y) {
+                        const int32_t y_row = (height - 1 - y) * width;
 
-                        if (fread(buffer, sizeof(uint8_t), row_size, file) != row_size) {
+                        if (fread(buffer, sizeof(uint8_t), row_size, file) != (uint32_t)row_size) {
                             free(buffer);
                             rvalue = false;
                             break;
                         }
 
-                        for (uint32_t x = 0; x < width; ++x) {
-                            const uint32_t x_col = x * 3;
+                        for (int32_t x = 0; x < width; ++x) {
+                            const int32_t x_col = x * 3;
 
                             self->b.ptr[y_row + x] = buffer[x_col + 0];
                             self->g.ptr[y_row + x] = buffer[x_col + 1];
                             self->r.ptr[y_row + x] = buffer[x_col + 2];
                         }
                     }
+
+                    self->r.width  = width;
+                    self->r.height = height;
+
+                    self->g.width  = width;
+                    self->g.height = height;
+
+                    self->b.width  = width;
+                    self->b.height = height;
 
                     free(buffer);
                     rvalue = true;
@@ -160,26 +214,26 @@ static bool Save(struct g_bmp_t *self, const char *filename) {
             fwrite(&self->bmp_header, sizeof(g_bmp_header_t), 1, file);
             fwrite(&self->dib_header, sizeof(g_dib_header_t), 1, file);
 
-            const uint32_t width  = (uint32_t)self->r.width;
-            const uint32_t height = (uint32_t)self->r.height;
+            const int32_t width  = self->r.width;
+            const int32_t height = self->r.height;
 
-            const uint32_t row_size = (uint32_t)((width * 3 + 3) & ~3); // 32-bit aligned
+            const int32_t row_size = (width * 3 + 3) & ~3; // 32-bit aligned
 
             uint8_t *buffer = (uint8_t *)malloc(row_size);
 
             if (buffer != NULL) {
-                for (uint32_t y = 0; y < height; ++y) {
-                    const uint32_t y_row = (height - 1 - y) * width;
+                for (int32_t y = 0; y < height; ++y) {
+                    const int32_t y_row = (height - 1 - y) * width;
 
-                    for (uint32_t x = 0; x < width; ++x) {
-                        const uint32_t x_col = x * 3;
+                    for (int32_t x = 0; x < width; ++x) {
+                        const int32_t x_col = x * 3;
 
                         buffer[x_col + 0] = self->b.ptr[y_row + x];
                         buffer[x_col + 1] = self->g.ptr[y_row + x];
                         buffer[x_col + 2] = self->r.ptr[y_row + x];
                     }
 
-                    if (fwrite(buffer, sizeof(uint8_t), row_size, file) != row_size) {
+                    if (fwrite(buffer, sizeof(uint8_t), row_size, file) != (uint32_t)row_size) {
                         free(buffer);
                         rvalue = false;
                         break;
@@ -308,49 +362,6 @@ static bool applyKernel(struct g_bmp_t *self, struct g_bmp_t *output, float *ker
     }
 
     return rvalue;
-}
-
-static g_hsi_t __rgb_to_hsi(g_rgb_t rgb) {
-    g_hsi_t hsi = {0};
-
-    const uint8_t R = rgb.r;
-    const uint8_t G = rgb.g;
-    const uint8_t B = rgb.b;
-
-    const uint8_t  max_RGB = (R > G) ? ((R > B) ? R : B) : ((G > B) ? G : B);
-    const uint8_t  min_RGB = (R < G) ? ((R < B) ? R : B) : ((G < B) ? G : B);
-    const uint8_t  delta   = max_RGB - min_RGB;
-    const uint16_t sum     = R + G + B;
-
-    // Intensity (I)
-    hsi.i = (float)sum / (3 * 255);
-
-    // Saturation (S)
-    if (delta < 10) { // Threshold
-        hsi.s = 0.0f;
-    } else {
-        hsi.s = 1.0f - ((float)min_RGB / 255) / hsi.i;
-    }
-
-    // Hue (H)
-    if (delta < 10) { // Threshold
-        hsi.h = 0.0f;
-    } else {
-        float hue;
-        if (max_RGB == R) {
-            hue = (G - B) / (float)delta;
-        } else if (max_RGB == G) {
-            hue = 2.0f + (B - R) / (float)delta;
-        } else {
-            hue = 4.0f + (R - G) / (float)delta;
-        }
-
-        // Scale hue to [0, 2π]
-        hsi.h = (hue < 0.0f) ? hue + (float)M_2_PI : hue;
-        hsi.h *= (float)M_PI / 3.0f;
-    }
-
-    return hsi;
 }
 
 static bool selectColor(struct g_bmp_t *self, struct g_bmp_t *output, g_rgb_t color, g_hsi_t range) {
