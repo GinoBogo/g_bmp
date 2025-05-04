@@ -9,7 +9,7 @@
 #include "g_bmp.h"
 
 #include <assert.h> // assert
-#include <math.h>   // M_PI, acosf, fmaxf, fminf, sqrtf
+#include <math.h>   // M_2_PI, M_PI, fmaxf, fminf, sqrtf
 #include <stddef.h> // NULL
 #include <stdio.h>  // FILE, fopen, fclose, fread, fwrite
 #include <stdlib.h> // free, malloc
@@ -311,34 +311,43 @@ static bool applyKernel(struct g_bmp_t *self, struct g_bmp_t *output, float *ker
 }
 
 static g_hsi_t __rgb_to_hsi(g_rgb_t rgb) {
-    g_hsi_t hsi;
+    g_hsi_t hsi = {0};
 
-    const float R = (float)rgb.r;
-    const float G = (float)rgb.g;
-    const float B = (float)rgb.b;
+    const uint8_t R = rgb.r;
+    const uint8_t G = rgb.g;
+    const uint8_t B = rgb.b;
 
-    // Calculate INTENSITY
-    hsi.i = (R + G + B) / 3.0f;
+    const uint8_t  max_RGB = (R > G) ? ((R > B) ? R : B) : ((G > B) ? G : B);
+    const uint8_t  min_RGB = (R < G) ? ((R < B) ? R : B) : ((G < B) ? G : B);
+    const uint8_t  delta   = max_RGB - min_RGB;
+    const uint16_t sum     = R + G + B;
 
-    // Calculate SATURATION
-    float min_RGB = fminf(fminf(R, G), B);
+    // Intensity (I)
+    hsi.i = (float)sum / (3 * 255);
 
-    if (hsi.i == 0.0f) {
-        hsi.s = 0.0f; // Undefined (achromatic)
+    // Saturation (S)
+    if (delta < 10) { // Threshold
+        hsi.s = 0.0f;
     } else {
-        hsi.s = 1.0f - (min_RGB / hsi.i);
+        hsi.s = 1.0f - ((float)min_RGB / 255) / hsi.i;
     }
 
-    // Calculate HUE (radians)
-    float num = 0.5f * ((R - G) + (R - B));
-    float den = sqrtf((R - G) * (R - G) + (R - B) * (G - B));
-
-    if (den == 0.0f) {
-        hsi.h = 0.0f; // Undefined (achromatic)
+    // Hue (H)
+    if (delta < 10) { // Threshold
+        hsi.h = 0.0f;
     } else {
-        float theta = acosf(num / den);
+        float hue;
+        if (max_RGB == R) {
+            hue = (G - B) / (float)delta;
+        } else if (max_RGB == G) {
+            hue = 2.0f + (B - R) / (float)delta;
+        } else {
+            hue = 4.0f + (R - G) / (float)delta;
+        }
 
-        hsi.h = (B <= G) ? theta : (2.0f * (float)M_PI) - theta;
+        // Scale hue to [0, 2π]
+        hsi.h = (hue < 0.0f) ? hue + (float)M_2_PI : hue;
+        hsi.h *= (float)M_PI / 3.0f;
     }
 
     return hsi;
@@ -350,17 +359,17 @@ static bool selectColor(struct g_bmp_t *self, struct g_bmp_t *output, g_rgb_t co
     if ((self != NULL) && self->_is_safe) {
         rvalue = true;
 
-        const uint32_t width  = (uint32_t)self->r.width;
-        const uint32_t height = (uint32_t)self->r.height;
+        const int32_t width  = (int32_t)self->r.width;
+        const int32_t height = (int32_t)self->r.height;
 
         if (output->Create(output, width, height)) {
             const g_hsi_t ref = __rgb_to_hsi(color);
 
-            for (uint32_t y = 0; y < height; ++y) {
-                const uint32_t y_row = y * width;
+            for (int32_t y = 0; y < height; ++y) {
+                const int32_t y_row = y * width;
 
-                for (uint32_t x = 0; x < width; ++x) {
-                    const uint32_t pixel_idx = y_row + x;
+                for (int32_t x = 0; x < width; ++x) {
+                    const int32_t pixel_idx = y_row + x;
 
                     g_rgb_t rgb = {
                         .r = self->r.ptr[pixel_idx],
