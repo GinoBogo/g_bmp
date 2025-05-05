@@ -295,20 +295,20 @@ static bool toGrayscale(struct g_bmp_t *self) {
     return rvalue;
 }
 
-static bool applyKernel(struct g_bmp_t *self, struct g_bmp_t *output, float *kernel_ptr, int32_t kernel_len) {
+static bool applyFilter(struct g_bmp_t *self, struct g_bmp_t *output, float *filter_ptr, int32_t filter_len) {
     bool rvalue = false;
 
     if ((self != NULL) && self->_is_safe) {
         rvalue = true;
 
-        const int32_t kernel_dim = (int32_t)sqrtf((float)kernel_len);
-        const int32_t kernel_pad = (kernel_dim - 1) / 2;
+        const int32_t filter_dim = (int32_t)sqrtf((float)filter_len);
+        const int32_t filter_pad = (filter_dim - 1) / 2;
 
         rvalue = rvalue && (output != NULL);
-        rvalue = rvalue && (kernel_ptr != NULL);
-        rvalue = rvalue && (kernel_len > 1);
-        rvalue = rvalue && (kernel_dim * kernel_dim == kernel_len);
-        rvalue = rvalue && (kernel_dim % 2 == 1); // odd-sized kernels only
+        rvalue = rvalue && (filter_ptr != NULL);
+        rvalue = rvalue && (filter_len > 1);
+        rvalue = rvalue && (filter_dim * filter_dim == filter_len);
+        rvalue = rvalue && (filter_dim % 2 == 1); // odd-sized filters only
 
         if (rvalue) {
             const int32_t width  = self->r.width;
@@ -317,36 +317,36 @@ static bool applyKernel(struct g_bmp_t *self, struct g_bmp_t *output, float *ker
             rvalue = output->Create(output, width, height);
 
             if (rvalue) {
-                for (int32_t y = -kernel_pad; y < height - kernel_pad; ++y) {
-                    const int32_t dst_y = y + kernel_pad;
+                for (int32_t y = -filter_pad; y < height - filter_pad; ++y) {
+                    const int32_t dst_y = y + filter_pad;
 
-                    for (int32_t x = -kernel_pad; x < width - kernel_pad; ++x) {
-                        const int32_t dst_x = x + kernel_pad;
+                    for (int32_t x = -filter_pad; x < width - filter_pad; ++x) {
+                        const int32_t dst_x = x + filter_pad;
 
                         float sum_r = 0.0f;
                         float sum_g = 0.0f;
                         float sum_b = 0.0f;
 
-                        for (int32_t ky = 0; ky < kernel_dim; ++ky) {
+                        for (int32_t ky = 0; ky < filter_dim; ++ky) {
                             // Clamp to edge for y coordinate
                             const int32_t src_y = (y + ky < 0)       ? 0          //
                                                 : (y + ky >= height) ? height - 1 //
                                                                      : y + ky;    //
 
-                            for (int32_t kx = 0; kx < kernel_dim; ++kx) {
+                            for (int32_t kx = 0; kx < filter_dim; ++kx) {
                                 // Clamp to edge for x coordinate
                                 const int32_t src_x = (x + kx < 0)      ? 0         //
                                                     : (x + kx >= width) ? width - 1 //
                                                                         : x + kx;   //
 
-                                const int32_t kernel_idx = ky * kernel_dim + kx;
-                                const float   kernel_val = kernel_ptr[kernel_idx];
+                                const int32_t filter_idx = ky * filter_dim + kx;
+                                const float   filter_val = filter_ptr[filter_idx];
 
                                 const int32_t pixel_idx = src_y * width + src_x;
 
-                                sum_r += ((float)(self->r.ptr[pixel_idx]) * kernel_val);
-                                sum_g += ((float)(self->g.ptr[pixel_idx]) * kernel_val);
-                                sum_b += ((float)(self->b.ptr[pixel_idx]) * kernel_val);
+                                sum_r += ((float)(self->r.ptr[pixel_idx]) * filter_val);
+                                sum_g += ((float)(self->g.ptr[pixel_idx]) * filter_val);
+                                sum_b += ((float)(self->b.ptr[pixel_idx]) * filter_val);
                             }
                         }
 
@@ -426,7 +426,7 @@ void g_bmp_link(g_bmp_t *self) {
         self->getWidth    = getWidth;
         self->getHeight   = getHeight;
         self->toGrayscale = toGrayscale;
-        self->applyKernel = applyKernel;
+        self->applyFilter = applyFilter;
         self->selectColor = selectColor;
     }
 }
