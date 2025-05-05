@@ -269,13 +269,13 @@ static bool toGrayscale(struct g_bmp_t *self) {
     bool rvalue = false;
 
     if ((self != NULL) && self->_is_safe) {
-        const uint32_t width  = (uint32_t)self->r.width;
-        const uint32_t height = (uint32_t)self->r.height;
+        const int32_t width  = self->r.width;
+        const int32_t height = self->r.height;
 
-        for (uint32_t y = 0; y < height; ++y) {
-            const uint32_t y_row = (height - 1 - y) * width;
+        for (int32_t y = 0; y < height; ++y) {
+            const int32_t y_row = (height - 1 - y) * width;
 
-            for (uint32_t x = 0; x < width; ++x) {
+            for (int32_t x = 0; x < width; ++x) {
                 const uint8_t r = self->r.ptr[y_row + x];
                 const uint8_t g = self->g.ptr[y_row + x];
                 const uint8_t b = self->b.ptr[y_row + x];
