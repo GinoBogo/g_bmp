@@ -72,5 +72,19 @@ int main(int argc, char *argv[]) {
 
     image.Destroy(&image);
 
+    if (image.Load(&image, "sample-01.bmp")) {
+        g_bmp_t output;
+
+        g_bmp_link(&output);
+
+        if (image.selectColor(&image, &output, (g_rgb_t){254, 254, 183}, (g_hsi_t){0.8, 0.1, 0.5})) {
+            output.Save(&output, "sample-01_yellowscale.bmp");
+        }
+
+        output.Destroy(&output);
+    }
+
+    image.Destroy(&image);
+
     return 0;
 }
