@@ -364,7 +364,7 @@ static bool applyFilter(struct g_bmp_t *self, struct g_bmp_t *output, float *fil
     return rvalue;
 }
 
-static bool selectColor(struct g_bmp_t *self, struct g_bmp_t *output, g_rgb_t color, g_hsi_t range) {
+static bool selectColor(struct g_bmp_t *self, struct g_bmp_t *output, g_rgb_t color, g_hsi_t threshold) {
     bool rvalue = false;
 
     if ((self != NULL) && self->_is_safe) {
@@ -390,9 +390,9 @@ static bool selectColor(struct g_bmp_t *self, struct g_bmp_t *output, g_rgb_t co
 
                     g_hsi_t hsi = __rgb_to_hsi(rgb);
 
-                    const bool check_1 = ((ref.h - range.h) <= hsi.h) && (hsi.h <= (ref.h + range.h));
-                    const bool check_2 = ((ref.s - range.s) <= hsi.s) && (hsi.s <= (ref.s + range.s));
-                    const bool check_3 = ((ref.i - range.i) <= hsi.i) && (hsi.i <= (ref.i + range.i));
+                    const bool check_1 = ((ref.h - threshold.h) <= hsi.h) && (hsi.h <= (ref.h + threshold.h));
+                    const bool check_2 = ((ref.s - threshold.s) <= hsi.s) && (hsi.s <= (ref.s + threshold.s));
+                    const bool check_3 = ((ref.i - threshold.i) <= hsi.i) && (hsi.i <= (ref.i + threshold.i));
 
                     if (check_1 && check_2 && check_3) {
                         output->r.ptr[pixel_idx] = rgb.r;

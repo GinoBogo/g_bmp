@@ -76,7 +76,7 @@ typedef struct g_bmp_t {
 
     bool (*applyFilter)(struct g_bmp_t *self, struct g_bmp_t *output, float *filter_ptr, int32_t filter_len);
 
-    bool (*selectColor)(struct g_bmp_t *self, struct g_bmp_t *output, g_rgb_t color, g_hsi_t range);
+    bool (*selectColor)(struct g_bmp_t *self, struct g_bmp_t *output, g_rgb_t color, g_hsi_t threshold);
 
     // intrinsic
     bool _is_safe;
