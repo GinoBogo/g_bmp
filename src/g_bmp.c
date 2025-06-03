@@ -89,16 +89,16 @@ static bool __is_within_color_range(g_hsi_t *hsi, g_hsi_t *hsi_min, g_hsi_t *hsi
 // -----------------------------------------------------------------------------
 
 static bool Create(struct g_bmp_t *self, int32_t width, int32_t height) {
-    bool rvalue = false;
+    bool rvalue = (self != NULL) && (width > 0) && (height > 0);
 
-    if ((self != NULL) && (width > 0) && (height > 0)) {
+    if (rvalue) {
         self->Destroy(self);
 
-        self->r.ptr = (uint8_t *)malloc(width * height * sizeof(uint8_t));
-        self->g.ptr = (uint8_t *)malloc(width * height * sizeof(uint8_t));
-        self->b.ptr = (uint8_t *)malloc(width * height * sizeof(uint8_t));
+        uint32_t bytes = (uint32_t)(width * height * sizeof(uint8_t));
 
-        rvalue = true;
+        self->r.ptr = (uint8_t *)malloc(bytes);
+        self->g.ptr = (uint8_t *)malloc(bytes);
+        self->b.ptr = (uint8_t *)malloc(bytes);
 
         rvalue = rvalue && (self->r.ptr != NULL);
         rvalue = rvalue && (self->g.ptr != NULL);
@@ -140,6 +140,8 @@ static bool Create(struct g_bmp_t *self, int32_t width, int32_t height) {
             self->dib_header.important_colors = 0;    // all colors are important
 
             self->_is_safe = true;
+        } else {
+            self->Destroy(self);
         }
     }
 
@@ -157,12 +159,14 @@ static void Destroy(struct g_bmp_t *self) {
 }
 
 static bool Load(struct g_bmp_t *self, const char *filename) {
-    bool rvalue = false;
+    bool rvalue = (self != NULL) && (filename != NULL);
 
-    if ((self != NULL) && (filename != NULL)) {
+    if (rvalue) {
         FILE *file = fopen(filename, "rb");
 
-        if (file != NULL) {
+        rvalue = (file != NULL);
+
+        if (rvalue) {
             self->Destroy(self);
 
             fread(&self->bmp_header, sizeof(g_bmp_header_t), 1, file);
@@ -171,12 +175,16 @@ static bool Load(struct g_bmp_t *self, const char *filename) {
             const int32_t width  = self->dib_header.width;
             const int32_t height = self->dib_header.height;
 
-            if (self->Create(self, width, height)) {
+            rvalue = self->Create(self, width, height);
+
+            if (rvalue) {
                 const int32_t row_size = (width * 3 + 3) & ~3; // 32-bit aligned
 
                 uint8_t *buffer = (uint8_t *)malloc(row_size);
 
-                if (buffer != NULL) {
+                rvalue = (buffer != NULL);
+
+                if (rvalue) {
                     for (int32_t y = 0; y < height; ++y) {
                         const int32_t y_row = (height - 1 - y) * width;
 
@@ -205,7 +213,6 @@ static bool Load(struct g_bmp_t *self, const char *filename) {
                     self->b.height = height;
 
                     free(buffer);
-                    rvalue = true;
                 }
             }
 
@@ -217,12 +224,14 @@ static bool Load(struct g_bmp_t *self, const char *filename) {
 }
 
 static bool Save(struct g_bmp_t *self, const char *filename) {
-    bool rvalue = false;
+    bool rvalue = (self != NULL) && self->_is_safe;
 
-    if ((self != NULL) && self->_is_safe) {
+    if (rvalue) {
         FILE *file = fopen(filename, "wb");
 
-        if (file != NULL) {
+        rvalue = (file != NULL);
+
+        if (rvalue) {
             fwrite(&self->bmp_header, sizeof(g_bmp_header_t), 1, file);
             fwrite(&self->dib_header, sizeof(g_dib_header_t), 1, file);
 
@@ -233,7 +242,9 @@ static bool Save(struct g_bmp_t *self, const char *filename) {
 
             uint8_t *buffer = (uint8_t *)malloc(row_size);
 
-            if (buffer != NULL) {
+            rvalue = (buffer != NULL);
+
+            if (rvalue) {
                 for (int32_t y = 0; y < height; ++y) {
                     const int32_t y_row = (height - 1 - y) * width;
 
@@ -253,7 +264,6 @@ static bool Save(struct g_bmp_t *self, const char *filename) {
                 }
 
                 free(buffer);
-                rvalue = true;
             }
 
             fclose(file);
@@ -278,9 +288,9 @@ static int32_t getHeight(struct g_bmp_t *self) {
 }
 
 static bool toGrayscale(struct g_bmp_t *self) {
-    bool rvalue = false;
+    bool rvalue = (self != NULL) && self->_is_safe;
 
-    if ((self != NULL) && self->_is_safe) {
+    if (rvalue) {
         const int32_t width  = self->r.width;
         const int32_t height = self->r.height;
 
@@ -300,8 +310,6 @@ static bool toGrayscale(struct g_bmp_t *self) {
                 self->b.ptr[y_row + x] = gray;
             }
         }
-
-        rvalue = true;
     }
 
     return rvalue;
@@ -381,11 +389,9 @@ static bool applyKernel(struct g_bmp_t         *self,
                         struct g_feature_map_t *output,
                         float                  *weights_ptr[3], // a weights array for each channel
                         int32_t                 weights_len) {
-    bool rvalue = false;
+    bool rvalue = (self != NULL) && self->_is_safe;
 
-    if ((self != NULL) && self->_is_safe) {
-        rvalue = true;
-
+    if (rvalue) {
         const int32_t weights_dim = (int32_t)sqrtf((float)weights_len);
         const int32_t weights_pad = (weights_dim - 1) / 2;
 
@@ -452,15 +458,15 @@ static bool applyKernel(struct g_bmp_t         *self,
 }
 
 static bool selectColor(struct g_bmp_t *self, struct g_bmp_t *output, g_rgb_t color, g_hsi_t threshold) {
-    bool rvalue = false;
+    bool rvalue = (self != NULL) && self->_is_safe;
 
-    if ((self != NULL) && self->_is_safe) {
-        rvalue = true;
-
+    if (rvalue) {
         const int32_t width  = (int32_t)self->r.width;
         const int32_t height = (int32_t)self->r.height;
 
-        if (output->Create(output, width, height)) {
+        rvalue = output->Create(output, width, height);
+
+        if (rvalue) {
             const g_hsi_t ref = __rgb_to_hsi(color);
 
             for (int32_t y = 0; y < height; ++y) {
@@ -492,8 +498,6 @@ static bool selectColor(struct g_bmp_t *self, struct g_bmp_t *output, g_rgb_t co
                     }
                 }
             }
-
-            rvalue = true;
         }
     }
 
@@ -501,15 +505,15 @@ static bool selectColor(struct g_bmp_t *self, struct g_bmp_t *output, g_rgb_t co
 }
 
 static bool selectColorRange(struct g_bmp_t *self, struct g_bmp_t *output, g_rgb_t color_a, g_rgb_t color_b) {
-    bool rvalue = false;
+    bool rvalue = (self != NULL) && self->_is_safe;
 
-    if ((self != NULL) && self->_is_safe) {
-        rvalue = true;
-
+    if (rvalue) {
         const int32_t width  = (int32_t)self->r.width;
         const int32_t height = (int32_t)self->r.height;
 
-        if (output->Create(output, width, height)) {
+        rvalue = output->Create(output, width, height);
+
+        if (rvalue) {
             g_hsi_t hsi_a = __rgb_to_hsi(color_a);
             g_hsi_t hsi_b = __rgb_to_hsi(color_b);
 
@@ -549,8 +553,6 @@ static bool selectColorRange(struct g_bmp_t *self, struct g_bmp_t *output, g_rgb
                     }
                 }
             }
-
-            rvalue = true;
         }
     }
 
