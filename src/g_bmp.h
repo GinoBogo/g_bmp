@@ -54,6 +54,12 @@ typedef struct g_bmp_channel_t {
     int32_t  height;
 } g_bmp_channel_t;
 
+typedef struct g_feature_map_t {
+    float  *ptr;
+    int32_t width;
+    int32_t height;
+} g_feature_map_t;
+
 typedef struct g_bmp_t {
     // variables
     g_bmp_channel_t r;
@@ -75,6 +81,8 @@ typedef struct g_bmp_t {
     bool (*toGrayscale)(struct g_bmp_t *self);
 
     bool (*applyFilter)(struct g_bmp_t *self, struct g_bmp_t *output, float *filter_ptr, int32_t filter_len);
+
+    bool (*applyKernel)(struct g_bmp_t *self, struct g_feature_map_t *output, float *weights_ptr[3], int32_t weights_len);
 
     bool (*selectColor)(struct g_bmp_t *self, struct g_bmp_t *output, g_rgb_t color, g_hsi_t threshold);
 

@@ -9,9 +9,9 @@
 #include "g_bmp.h"
 
 #include <assert.h> // assert
-#include <math.h>   // M_2_PI, M_PI, fmaxf, fminf, sqrtf
+#include <math.h>   // M_PI, fmaxf, fminf, sqrtf
 #include <stddef.h> // NULL
-#include <stdio.h>  // FILE, fopen, fclose, fread, fwrite
+#include <stdio.h>  // FILE, fclose, fopen, fread, fwrite
 #include <stdlib.h> // free, malloc
 #include <string.h> // memset
 
@@ -307,12 +307,13 @@ static bool toGrayscale(struct g_bmp_t *self) {
     return rvalue;
 }
 
-static bool applyFilter(struct g_bmp_t *self, struct g_bmp_t *output, float *filter_ptr, int32_t filter_len) {
-    bool rvalue = false;
+static bool applyFilter(struct g_bmp_t *self,       //
+                        struct g_bmp_t *output,     //
+                        float          *filter_ptr, //
+                        int32_t         filter_len) {
+    bool rvalue = (self != NULL) && self->_is_safe;
 
-    if ((self != NULL) && self->_is_safe) {
-        rvalue = true;
-
+    if (rvalue) {
         const int32_t filter_dim = (int32_t)sqrtf((float)filter_len);
         const int32_t filter_pad = (filter_dim - 1) / 2;
 
@@ -367,6 +368,80 @@ static bool applyFilter(struct g_bmp_t *self, struct g_bmp_t *output, float *fil
                         output->r.ptr[dst_idx] = (uint8_t)fminf(fmaxf(sum_r, 0.0f), 255.0f);
                         output->g.ptr[dst_idx] = (uint8_t)fminf(fmaxf(sum_g, 0.0f), 255.0f);
                         output->b.ptr[dst_idx] = (uint8_t)fminf(fmaxf(sum_b, 0.0f), 255.0f);
+                    }
+                }
+            }
+        }
+    }
+
+    return rvalue;
+}
+
+static bool applyKernel(struct g_bmp_t         *self,
+                        struct g_feature_map_t *output,
+                        float                  *weights_ptr[3], // a weights array for each channel
+                        int32_t                 weights_len) {
+    bool rvalue = false;
+
+    if ((self != NULL) && self->_is_safe) {
+        rvalue = true;
+
+        const int32_t weights_dim = (int32_t)sqrtf((float)weights_len);
+        const int32_t weights_pad = (weights_dim - 1) / 2;
+
+        rvalue = rvalue && (output != NULL);
+        rvalue = rvalue && (weights_ptr != NULL);
+        rvalue = rvalue && (weights_len > 1);
+        rvalue = rvalue && (weights_dim * weights_dim == weights_len);
+        rvalue = rvalue && (weights_dim % 2 == 1); // odd-sized kernels only
+
+        if (rvalue) {
+            rvalue = rvalue && (weights_ptr[0] != NULL);
+            rvalue = rvalue && (weights_ptr[1] != NULL);
+            rvalue = rvalue && (weights_ptr[2] != NULL);
+        }
+
+        if (rvalue) {
+            const int32_t width  = self->r.width;
+            const int32_t height = self->r.height;
+
+            rvalue = rvalue && (output->ptr != NULL);
+            rvalue = rvalue && (output->width == width);
+            rvalue = rvalue && (output->height == height);
+
+            if (rvalue) {
+                for (int32_t y = -weights_pad; y < height - weights_pad; ++y) {
+                    const int32_t dst_y = y + weights_pad;
+
+                    for (int32_t x = -weights_pad; x < width - weights_pad; ++x) {
+                        const int32_t dst_x = x + weights_pad;
+
+                        float sum = 0.0f;
+
+                        for (int32_t ky = 0; ky < weights_dim; ++ky) {
+                            // Clamp to edge for y coordinate
+                            const int32_t src_y = (y + ky < 0)       ? 0          //
+                                                : (y + ky >= height) ? height - 1 //
+                                                                     : y + ky;    //
+
+                            for (int32_t kx = 0; kx < weights_dim; ++kx) {
+                                // Clamp to edge for x coordinate
+                                const int32_t src_x = (x + kx < 0)      ? 0         //
+                                                    : (x + kx >= width) ? width - 1 //
+                                                                        : x + kx;   //
+
+                                const int32_t weights_idx = ky * weights_dim + kx;
+
+                                const int32_t pixel_idx = src_y * width + src_x;
+
+                                sum += ((float)(self->r.ptr[pixel_idx]) * weights_ptr[0][weights_idx]);
+                                sum += ((float)(self->g.ptr[pixel_idx]) * weights_ptr[1][weights_idx]);
+                                sum += ((float)(self->b.ptr[pixel_idx]) * weights_ptr[2][weights_idx]);
+                            }
+                        }
+
+                        const int32_t dst_idx = dst_y * width + dst_x;
+                        output->ptr[dst_idx]  = fminf(fmaxf(sum, 0.0f), 255.0f);
                     }
                 }
             }
@@ -496,6 +571,7 @@ void g_bmp_link(g_bmp_t *self) {
         self->getHeight        = getHeight;
         self->toGrayscale      = toGrayscale;
         self->applyFilter      = applyFilter;
+        self->applyKernel      = applyKernel;
         self->selectColor      = selectColor;
         self->selectColorRange = selectColorRange;
     }
