@@ -78,6 +78,8 @@ typedef struct g_bmp_t {
 
     bool (*selectColor)(struct g_bmp_t *self, struct g_bmp_t *output, g_rgb_t color, g_hsi_t threshold);
 
+    bool (*selectColorRange)(struct g_bmp_t *self, struct g_bmp_t *output, g_rgb_t color_a, g_rgb_t color_b);
+
     // intrinsic
     bool _is_safe;
 } g_bmp_t;

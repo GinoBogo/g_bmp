@@ -72,6 +72,18 @@ static g_hsi_t __rgb_to_hsi(g_rgb_t rgb) {
     return hsi;
 }
 
+static bool __is_within_color_range(g_hsi_t *hsi, g_hsi_t *hsi_min, g_hsi_t *hsi_max) {
+    bool rvalue = (hsi != NULL) && (hsi_min != NULL) && (hsi_max != NULL);
+
+    if (rvalue) {
+        rvalue &= (hsi->h >= hsi_min->h) && (hsi->h <= hsi_max->h);
+        rvalue &= (hsi->i >= hsi_min->i) && (hsi->i <= hsi_max->i);
+        rvalue &= (hsi->s >= hsi_min->s) && (hsi->s <= hsi_max->s);
+    }
+
+    return rvalue;
+}
+
 // -----------------------------------------------------------------------------
 // Linked Functions
 // -----------------------------------------------------------------------------
@@ -413,21 +425,79 @@ static bool selectColor(struct g_bmp_t *self, struct g_bmp_t *output, g_rgb_t co
     return rvalue;
 }
 
+static bool selectColorRange(struct g_bmp_t *self, struct g_bmp_t *output, g_rgb_t color_a, g_rgb_t color_b) {
+    bool rvalue = false;
+
+    if ((self != NULL) && self->_is_safe) {
+        rvalue = true;
+
+        const int32_t width  = (int32_t)self->r.width;
+        const int32_t height = (int32_t)self->r.height;
+
+        if (output->Create(output, width, height)) {
+            g_hsi_t hsi_a = __rgb_to_hsi(color_a);
+            g_hsi_t hsi_b = __rgb_to_hsi(color_b);
+
+            g_hsi_t hsi_min = {
+                .h = fminf(hsi_a.h, hsi_b.h),
+                .s = fminf(hsi_a.s, hsi_b.s),
+                .i = fminf(hsi_a.i, hsi_b.i),
+            };
+            g_hsi_t hsi_max = {
+                .h = fmaxf(hsi_a.h, hsi_b.h),
+                .s = fmaxf(hsi_a.s, hsi_b.s),
+                .i = fmaxf(hsi_a.i, hsi_b.i),
+            };
+
+            for (int32_t y = 0; y < height; ++y) {
+                const int32_t y_row = y * width;
+
+                for (int32_t x = 0; x < width; ++x) {
+                    const int32_t pixel_idx = y_row + x;
+
+                    g_rgb_t rgb = {
+                        .r = self->r.ptr[pixel_idx],
+                        .g = self->g.ptr[pixel_idx],
+                        .b = self->b.ptr[pixel_idx],
+                    };
+
+                    g_hsi_t hsi = __rgb_to_hsi(rgb);
+
+                    if (__is_within_color_range(&hsi, &hsi_min, &hsi_max)) {
+                        output->r.ptr[pixel_idx] = rgb.r;
+                        output->g.ptr[pixel_idx] = rgb.g;
+                        output->b.ptr[pixel_idx] = rgb.b;
+                    } else {
+                        output->r.ptr[pixel_idx] = 0;
+                        output->g.ptr[pixel_idx] = 0;
+                        output->b.ptr[pixel_idx] = 0;
+                    }
+                }
+            }
+
+            rvalue = true;
+        }
+    }
+
+    return rvalue;
+}
+
 void g_bmp_link(g_bmp_t *self) {
     if (self != NULL) {
         // variables & intrinsic
         __unsafe_reset(self);
 
         // functions
-        self->Create      = Create;
-        self->Destroy     = Destroy;
-        self->Load        = Load;
-        self->Save        = Save;
-        self->getWidth    = getWidth;
-        self->getHeight   = getHeight;
-        self->toGrayscale = toGrayscale;
-        self->applyFilter = applyFilter;
-        self->selectColor = selectColor;
+        self->Create           = Create;
+        self->Destroy          = Destroy;
+        self->Load             = Load;
+        self->Save             = Save;
+        self->getWidth         = getWidth;
+        self->getHeight        = getHeight;
+        self->toGrayscale      = toGrayscale;
+        self->applyFilter      = applyFilter;
+        self->selectColor      = selectColor;
+        self->selectColorRange = selectColorRange;
     }
 }
 
